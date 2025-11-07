@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Stock Dashboard</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        <form class="d-flex" method="get">
+            <!--Period Selector Dropdown-->
+            <select name="period" class="form-select me-2" id="periodSelect">
+                <option value="1d" {% if period == '1d' %}selected{% endif %}>1 Day</option>
+                <option value="5d" {% if period == '5d' %}selected{% endif %}>5 Days</option>
+                <option value="1mo" {% if period == '1mo' %}selected{% endif %}>1 Month</option>
+                <option value="3mo" {% if period == '3mo' %}selected{% endif %}>3 Months</option>
+                <option value="6mo" {% if period == '6mo' %}selected{% endif %}>6 Months</option>
+                <option value="ytd" {% if period == 'ytd' %}selected{% endif %}>Year to Date</option>
+                <option value="1y" {% if period == '1y' %}selected{% endif %}>1 Year</option>
+                <option value="2y" {% if period == '2y' %}selected{% endif %}>2 Years</option>
+                <option value="5y" {% if period == '5y' %}selected{% endif %}>5 Years</option>
+                <option value="10y" {% if period == '10y' %}selected{% endif %}>10 Years</option>
+            </select>
+
+            <select name="sorter" class="form-select me-2" id="sortSelect">
+                <option value="Largest Change" {% if sorter == 'Largest Change' %}selected{% endif %}>Largest Change</option>
+                <option value="Smallest Change" {% if sorter == 'Smallest Change' %}selected{% endif %}>Smallest Change</option>
+                <option value="Position" {% if sorter == 'Position' %}selected{% endif %}>Position in Watchlist</option>
+                <option value="Alphabetical" {% if sorter == 'Alphabetical' %}selected{% endif %}>Alphabetical</option>
+            </select>
+
+            <button class="btn btn-primary" type="submit">Track</button>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    {% for stock in stocks %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>{{ stock }}</h5>
+            </div>
+            <div class="card-body">
+                <div id="chart-{{ stock }}" style="height: 300px;"></div>
+                <div id="percentage-change-{{ stock }}" class="text-center mt-2 fw-bold"></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // This is where you'll load and render stock data
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get period from URL or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const period = urlParams.get('period') || '1mo';
+
+        {% for stock in stocks %}
+            fetchStockData('{{ stock }}', period);
+        {% endfor %}
+    });
+
+    function fetchStockData(symbol,period) {
+        fetch(`/api/stock-data?symbol=${symbol}&period=${period}`)
+            .then(response => response.json())
+            .then(data => {
+                renderChart(data.name, data.symbol, data.dates, data.prices, period);
+            })
+            .catch(error => console.error('Error fetching stock data:', error));
+    }
+
+    function renderChart(company_name, symbol, dates, prices, period) {
+        const first_price = prices[0]
+        const last_price = prices[prices.length - 1]
+        const price_difference = last_price - first_price
+
+        let periodConverted;
+        switch (period) {
+            case '1d':
+                periodConverted = 'Day';
+                break;
+            case '5d':
+                periodConverted = '5 Day';
+                break;
+            case '1mo':
+                periodConverted = '1 Month';
+                break;
+            case '3mo':
+                periodConverted = '3 Months';
+                break;
+            case '6mo':
+                periodConverted = '6 Months';
+                break;
+            case 'ytd':
+                periodConverted = 'Year-to-Date';
+                break;
+            case '1y':
+                periodConverted = '1 Year';
+                break;
+            case '2y':
+                periodConverted = '2 Years';
+                break;
+            case '5y':
+                periodConverted = '5 Years';
+                break;
+            case '10y':
+                periodConverted = '10 Years';
+                break;
+            default:
+                periodConverted = '';
+        }
+        // Calculate percentage change correctly
+        const price_percentage_change = ((last_price - first_price) / first_price) * 100;
+        const percentageFormatted = price_percentage_change.toFixed(2);
+
+        const line_color = price_difference < 0 ? '#C70039' : '#16b600';
+        const change_direction = price_difference < 0 ? '&#9660' : '&#9650';
+        
+        const trace = {
+            x: dates,
+            y: prices,
+            type: 'scatter',
+            mode: 'lines',
+            name: company_name,
+            line: {
+                color: line_color
+            }
+        };
+
+        const layout = {
+            title: `${company_name} Stock Price`,
+            xaxis: {
+                title: 'Date',
+                showgrid: false
+            },
+            yaxis: {
+                title: 'Price ($)',
+                showgrid: true
+            },
+            margin: { t: 40 }
+        };
+
+        Plotly.newPlot(`chart-${symbol}`, [trace], layout);
+
+        // Display percentage change
+        const percentageElement = document.getElementById(`percentage-change-${symbol}`);
+        percentageElement.innerHTML = `${periodConverted} Change: <span style="color:${line_color}">${change_direction} ${percentageFormatted}%</span>`;
+    }
+</script>
+{% endblock %}

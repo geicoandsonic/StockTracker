@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Top Movers{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Today's Top Movers</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        <form class="d-flex" method="get" id="periodForm">
+            <!--Period Selector Dropdown-->
+            <select name="period" class="form-select me-2" id="periodSelect">
+                <option value="1d" {% if period == '1d' %}selected{% endif %}>1 Day</option>
+                <option value="5d" {% if period == '5d' %}selected{% endif %}>5 Days</option>
+                <option value="1mo" {% if period == '1mo' %}selected{% endif %}>1 Month</option>
+                <option value="3mo" {% if period == '3mo' %}selected{% endif %}>3 Months</option>
+                <option value="6mo" {% if period == '6mo' %}selected{% endif %}>6 Months</option>
+                <option value="ytd" {% if period == 'ytd' %}selected{% endif %}>Year to Date</option>
+                <option value="1y" {% if period == '1y' %}selected{% endif %}>1 Year</option>
+                <option value="2y" {% if period == '2y' %}selected{% endif %}>2 Years</option>
+                <option value="5y" {% if period == '5y' %}selected{% endif %}>5 Years</option>
+                <option value="10y" {% if period == '10y' %}selected{% endif %}>10 Years</option>
+            </select>
+
+            <button class="btn btn-primary" type="submit">Track</button>
+        </form>
+    </div>
+</div>
+
+{# Display flash messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+<div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div id="loading-indicator" class="text-center my-3" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+
+<div class="row">
+    <div class="card">
+        <ul class="list-group list-group-flush">
+            {% for stock in stocks %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <!-- Stock symbol on the left -->
+                <div class="d-flex align-items-center">
+                    <span class="stock-symbol fw-bold">{{ stock }}</span>
+                </div>
+                <!-- Percentage change in the middle -->
+                <div id="percentage-change-{{ stock }}" class="text-center mt-2 fw-bold"></div>
+                <!-- Buttons to handle if we want to add the stock to our watchlist or if we already have it -->
+                {% if stock in watchlist_symbols %}
+                <button class="btn btn-secondary btn-sm" disabled>In Watchlist</button>
+                {% else %}
+                <a href="/add-to-watchlist/{{ stock }}" class="btn btn-outline-primary btn-sm">Add to Watchlist</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get period from URL or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const period = urlParams.get('period') || '1mo';
+
+        // Select the period in the dropdown
+        const periodSelect = document.getElementById('periodSelect');
+        if (periodSelect && period) {
+            periodSelect.value = period;
+        }
+
+        // Initial fetch of data for currently selected period
+        fetchTopMovers(period);
+    });
+
+    function fetchTopMovers(period) {
+        // Show loading indicator
+        document.getElementById('loading-indicator').style.display = 'block';
+
+        fetch(`/api/top-movers?period=${period}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('API response:', data);
+                // Clear any existing data
+                const stockElements = document.querySelectorAll('[id^="percentage-change-"]');
+                stockElements.forEach(element => {
+                    element.innerHTML = '';
+                });
+
+                // Process both gainers and losers
+                const allStocks = [...(data.gainers || []), ...(data.losers || [])];
+
+                allStocks.forEach(stock => {
+                    renderStockPercentage(stock, period);
+                });
+
+                // Hide loading indicator
+                document.getElementById('loading-indicator').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error fetching top movers data:', error);
+                // Hide loading indicator even on error
+                document.getElementById('loading-indicator').style.display = 'none';
+            });
+    }
+
+    function renderStockPercentage(stock, period) {
+        const symbol = stock.symbol;
+        const percentageFormatted = Math.abs(stock.change_percent).toFixed(2);
+        const line_color = stock.change_percent < 0 ? '#C70039' : '#16b600';
+        const change_direction = stock.change_percent < 0 ? '&#9660' : '&#9650';
+
+        // Convert period to readable format
+        let periodConverted = period;
+        switch (period) {
+            case '1d': periodConverted = '1 Day'; break;
+            case '5d': periodConverted = '5 Day'; break;
+            case '1mo': periodConverted = '1 Month'; break;
+            case '3mo': periodConverted = '3 Month'; break;
+            case '6mo': periodConverted = '6 Month'; break;
+            case 'ytd': periodConverted = 'YTD'; break;
+            case '1y': periodConverted = '1 Year'; break;
+            case '2y': periodConverted = '2 Year'; break;
+            case '5y': periodConverted = '5 Year'; break;
+            case '10y': periodConverted = '10 Year'; break;
+        }
+
+        console.log(`Rendering ${symbol} for period ${period}`);
+        // Display percentage change
+        const percentageElement = document.getElementById(`percentage-change-${symbol}`);
+        if (percentageElement) {
+            percentageElement.innerHTML = `${periodConverted} Change: <span style="color:${line_color}">${change_direction} ${percentageFormatted}%</span>`;
+        }
+    }
+
+    // REMOVE the change event listener to prevent automatic updates when dropdown changes
+    // Only handle form submission for updates
+    document.getElementById('periodForm').addEventListener('submit', function (e) {
+        // No need to prevent default - we want the form to submit naturally, which will reload the page
+        // with the new period parameter
+    });
+</script>
+{% endblock scripts %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Watchlist{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Watchlist</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        <!--<a href="/create-watchlist" class="btn btn-outline-primary btn-sm">Create New Watchlist</a>-->
+        <form action="/add-to-watchlist" method="post" class="d-flex">
+            <input type="text" name="ticker" class="form-control me-2"
+                   placeholder="Enter stock symbol (e.g., AAPL)" required>
+            <button class="btn btn-primary" type="submit">Add to Watchlist</button>
+        </form>
+
+    </div>
+</div>
+
+{# Display flash messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+<div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="row">
+    {% if stocks %}
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Your Tracked Stocks</h5>
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for stock in stocks %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <!-- Stock symbol on the left -->
+                <span class="stock-symbol">{{ stock }}</span>
+
+                <!-- All controls on the right -->
+                <div class="d-flex align-items-center">
+                    <!-- Up button - hide for first item (loop.first) -->
+                    {% if not loop.first %}
+                    <a href="/move-watchlist/{{ stock }}/up" class="btn btn-sm btn-outline-secondary me-1"
+                       data-bs-toggle="tooltip" data-bs-placement="top" title="Move Up">
+                        <i class="bi bi-arrow-up"></i>
+                    </a>
+                    {% else %}
+                    <!-- Placeholder to maintain spacing -->
+                    <span class="invisible btn btn-sm me-1">&nbsp;</span>
+                    {% endif %}
+
+                    <!-- Down button - hide for last item (loop.last) -->
+                    {% if not loop.last %}
+                    <a href="/move-watchlist/{{ stock }}/down" class="btn btn-sm btn-outline-secondary me-2"
+                       data-bs-toggle="tooltip" data-bs-placement="top" title="Move Down">
+                        <i class="bi bi-arrow-down"></i>
+                    </a>
+                    {% else %}
+                    <!-- Placeholder to maintain spacing -->
+                    <span class="invisible btn btn-sm me-3">&nbsp;</span>
+                    {% endif %}
+
+                    <!-- Delete Button -->
+                    <a href="/remove-from-watchlist/{{ stock }}" class="btn btn-sm btn-danger"
+                       data-bs-toggle="tooltip" data-bs-placement="top" title="Remove from Watchlist">
+                        <i class="bi bi-trash"></i> Remove
+                    </a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info">
+            Your watchlist is empty. Add stocks using the form above.
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block additional_head %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+<style>
+    .stock-symbol {
+        font-size: 1.2rem;
+        font-weight: 500;
+    }
+
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
